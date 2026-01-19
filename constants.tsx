@@ -1,7 +1,7 @@
 
 import React from 'react';
 
-export const DEFAULT_CATEGORIES = ['麻将', '德州', '台球', '网球', '羽毛球'];
+export const DEFAULT_CATEGORIES = ['麻将', '德州'];
 
 export const ICONS = {
   Plus: () => (
