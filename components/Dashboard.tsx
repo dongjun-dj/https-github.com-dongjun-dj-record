@@ -29,7 +29,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
     });
   }, [sortedRecords]);
 
-  // 处理分类数据，增加绝对值用于绘图
   const categoryData = useMemo(() => {
     const map: Record<string, number> = {};
     records.forEach(r => {
@@ -37,9 +36,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
     });
     return Object.entries(map).map(([name, value]) => ({ 
       name, 
-      value, // 实际值用于标签和颜色
-      absVal: Math.abs(value) // 绝对值用于柱状图长度
-    })).sort((a, b) => b.absVal - a.absVal); // 按规模排序
+      value,
+      absVal: Math.abs(value)
+    })).sort((a, b) => b.absVal - a.absVal);
   }, [records]);
 
   const totalBalance = useMemo(() => 
@@ -52,24 +51,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
     return (wins / records.length * 100).toFixed(1);
   }, [records]);
 
-  // X 轴范围仅基于绝对值最大值，确保柱体占满屏幕
   const xDomain = useMemo(() => {
     if (categoryData.length === 0) return [0, 100];
     const maxAbs = Math.max(...categoryData.map(d => d.absVal));
-    // 预留极小缓冲，主要靠 margin.right 留空给标签
-    return [0, maxAbs * 1.05] as [number, number];
+    return [0, maxAbs * 1.02] as [number, number];
   }, [categoryData]);
 
-  // 自定义标签：显示原始带符号的值，位置固定在柱体右侧
   const renderCustomLabel = (props: any) => {
-    const { x, y, width, height, value, index } = props;
-    const originalValue = categoryData[index].value;
-    const isNeg = originalValue < 0;
+    const { x, y, width, height, index } = props;
+    if (index === undefined) return null;
+    const item = categoryData[index];
+    const isNeg = item.value < 0;
     
-    // 标签位置：柱体宽度 + 12px 间距
     return (
       <text 
-        x={x + width + 12} 
+        x={x + width + 15} 
         y={y + height / 2} 
         fill={isNeg ? COLOR_LOSS : COLOR_GAIN} 
         textAnchor="start" 
@@ -77,7 +73,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
         className="font-mono"
         style={{ fontSize: '13px', fontWeight: '900' }}
       >
-        {originalValue >= 0 ? `+${originalValue.toLocaleString()}` : originalValue.toLocaleString()}
+        {item.value >= 0 ? `+${item.value.toLocaleString()}` : item.value.toLocaleString()}
       </text>
     );
   };
@@ -104,18 +100,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
           <div className="text-3xl font-black text-slate-700">{winRate}%</div>
         </div>
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">最大规模项</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">活跃规模项</p>
           <div className="text-3xl font-black text-slate-700 truncate">
             {categoryData[0]?.name || '-'}
           </div>
         </div>
       </div>
 
-      <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+      <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="flex justify-between items-center mb-8">
           <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
             <span className="w-2 h-2 bg-indigo-500 rounded-full"></span>
-            各分类规模对比
+            成果规模分布
           </h3>
           <div className="flex gap-4">
             <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-500 uppercase">
@@ -132,16 +128,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
             <BarChart 
               data={categoryData} 
               layout="vertical"
-              /* 为右侧标签预留约 120px 空间，确保柱体比例合理 */
-              margin={{ top: 10, right: 120, left: 30, bottom: 10 }}
+              margin={{ top: 10, right: 100, left: 30, bottom: 10 }}
               style={{ overflow: 'visible' }} 
             >
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-              <XAxis 
-                type="number" 
-                domain={xDomain as any} 
-                hide 
-              />
+              <XAxis type="number" domain={xDomain as any} hide />
               <YAxis 
                 dataKey="name" 
                 type="category" 
@@ -153,19 +144,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
               <Tooltip 
                 cursor={{ fill: '#f8fafc' }}
                 contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
-                formatter={(value: any, name: any, props: any) => {
-                  const originalVal = props.payload.value;
-                  return [originalVal.toLocaleString(), '净收益'];
-                }}
+                formatter={(value: any, name: any, props: any) => [props.payload.value.toLocaleString(), '净收益']}
               />
-              {/* 基准线固定在左侧 */}
               <ReferenceLine x={0} stroke="#cbd5e1" strokeWidth={2} />
-              {/* Fix: Moved radius from Cell to Bar as it is not valid on Cell and causes type issues */}
               <Bar 
                 dataKey="absVal" 
                 barSize={32} 
                 minPointSize={4}
-                radius={[0, 6, 6, 0]} // 所有柱子统一向右圆角
+                radius={[0, 6, 6, 0] as any}
               >
                 {categoryData.map((entry, index) => (
                   <Cell 
@@ -183,7 +169,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
       <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
         <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-8">
           <span className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></span>
-          年度收益曲线
+          成果趋势演变
         </h3>
         <div className="w-full h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
@@ -201,9 +187,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
                 tickLine={false} 
                 tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }}
               />
-              <Tooltip 
-                contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
-              />
+              <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }} />
               <ReferenceLine y={0} stroke="#cbd5e1" strokeDasharray="3 3" />
               <Line 
                 type="monotone" 
@@ -212,7 +196,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
                 strokeWidth={4} 
                 dot={{ r: 4, fill: '#4f46e5', strokeWidth: 2, stroke: '#fff' }}
                 activeDot={{ r: 6, strokeWidth: 0 }}
-                name="累计成果"
+                name="累计收益"
               />
             </LineChart>
           </ResponsiveContainer>
